@@ -1,6 +1,6 @@
 {
-    "name": "DaVinci Eye - AR Tracing",
-    "short_name": "DaVinci Eye",
+    "name": "Epinoa - AR Tracing",
+    "short_name": "Epinoa",
     "description": "Augmented reality tracing assistant for artists",
     "start_url": "/",
     "display": "standalone",
