@@ -1,41 +1,390 @@
-* {
-    marigin:0;
-    padding:0;
-    border:0;
+*, *::before, *::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
 }
 
-h1 {
-    text-align:center;
-    font-size: 575%;
-    color:#4A4444;
+:root {
+    --bg: #000;
+    --surface: rgba(20, 20, 20, 0.85);
+    --text: #fff;
+    --text-dim: rgba(255, 255, 255, 0.5);
+    --accent: #4a9eff;
+    --danger: #ff4444;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+#app {
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+
+/* Screens */
+.screen {
+    position: absolute;
+    inset: 0;
+    display: none;
+    flex-direction: column;
+}
+
+.screen.active {
+    display: flex;
+}
+
+/* Landing Screen */
+#landing-screen {
+    background: linear-gradient(145deg, #0a0a0a 0%, #1a1a2e 50%, #0a0a0a 100%);
+    justify-content: center;
+    align-items: center;
+}
+
+.landing-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 24px;
+    width: 100%;
+    max-width: 400px;
+}
+
+.logo {
+    margin-bottom: 8px;
+    opacity: 0.9;
+}
+
+.landing-content h1 {
+    font-size: 28px;
+    font-weight: 600;
+    letter-spacing: 2px;
     text-transform: uppercase;
-    letter-spacing: 1%;
-    margin: 45% 0;
+    color: #fff;
 }
 
-h2 {
-    text-align:center;
-    font-size: 575%;
-    color:#4A4444;
-    text-transform: uppercase;
-    letter-spacing: 1%;
-    margin: 45% 0;
-}
- /*Start Parallax*/
-
-.parallax {
-  background: url("css.images/times10.png") repeat fixed 45%;
-  background-size: 800px; opacity: 0.4;
-
-}
-.parallax-inner {
-  padding-top: 18%:
-  padding-bottom: 18%;
-  height: 400px;
-
-
+.subtitle {
+    font-size: 14px;
+    color: var(--text-dim);
+    margin-bottom: 24px;
 }
 
+.upload-area {
+    width: 100%;
+    border: 2px dashed rgba(255, 255, 255, 0.2);
+    border-radius: 16px;
+    padding: 40px 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    color: var(--text-dim);
+}
 
+.upload-area:hover,
+.upload-area.dragover {
+    border-color: var(--accent);
+    background: rgba(74, 158, 255, 0.05);
+    color: var(--text);
+}
 
- /*Start Parallax*/
+.upload-area p {
+    font-size: 15px;
+    text-align: center;
+}
+
+.upload-area .hint {
+    font-size: 12px;
+    color: var(--text-dim);
+}
+
+.btn {
+    padding: 12px 32px;
+    border-radius: 12px;
+    border: none;
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.1s;
+    color: var(--text);
+    background: var(--accent);
+    width: 100%;
+    max-width: 300px;
+}
+
+.btn:active {
+    transform: scale(0.97);
+}
+
+.btn-secondary {
+    background: rgba(255, 255, 255, 0.1);
+    margin-top: 8px;
+}
+
+/* Camera Screen */
+#camera-screen {
+    background: var(--bg);
+}
+
+#camera-feed {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: 1;
+}
+
+#overlay-container {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+#overlay-image {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    max-width: none;
+    transform-origin: center center;
+    pointer-events: auto;
+    touch-action: none;
+    will-change: transform, opacity;
+    display: none;
+}
+
+#overlay-image.loaded {
+    display: block;
+}
+
+/* Top toolbar */
+#top-toolbar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: calc(12px + var(--safe-top)) 12px 12px;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, transparent 100%);
+}
+
+#status-text {
+    font-size: 13px;
+    color: var(--text-dim);
+    text-align: center;
+    flex: 1;
+}
+
+.toolbar-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(0, 0, 0, 0.4);
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.2s;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+.toolbar-btn:active {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* Bottom controls */
+#bottom-controls {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 10;
+    padding: 16px 16px calc(16px + var(--safe-bottom));
+    background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 100%);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+#opacity-control {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 4px;
+}
+
+#opacity-control label {
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+#opacity-slider {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 2px;
+    outline: none;
+}
+
+#opacity-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--text);
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+#opacity-slider::-moz-range-thumb {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--text);
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+#opacity-value {
+    font-size: 13px;
+    color: var(--text-dim);
+    min-width: 36px;
+    text-align: right;
+}
+
+#action-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+}
+
+.action-btn {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+.action-btn:active {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+.action-btn.active {
+    background: var(--accent);
+    color: var(--text);
+}
+
+/* Error overlay */
+.overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+.overlay[hidden] {
+    display: none;
+}
+
+.overlay-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 32px;
+    max-width: 320px;
+    text-align: center;
+}
+
+.overlay-content p {
+    font-size: 15px;
+    color: var(--text-dim);
+    line-height: 1.5;
+}
+
+/* Locked state visual */
+#overlay-image.locked {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+}
+
+/* Loading state */
+.loading {
+    position: relative;
+}
+
+.loading::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.landing-content .logo { animation: fadeIn 0.4s ease-out both; animation-delay: 0s; }
+.landing-content h1 { animation: fadeIn 0.4s ease-out both; animation-delay: 0.05s; }
+.landing-content .subtitle { animation: fadeIn 0.4s ease-out both; animation-delay: 0.1s; }
+.landing-content .upload-area { animation: fadeIn 0.4s ease-out both; animation-delay: 0.15s; }
+.landing-content .btn { animation: fadeIn 0.4s ease-out both; animation-delay: 0.2s; }
+
+/* Responsive */
+@media (min-width: 768px) {
+    .landing-content h1 {
+        font-size: 36px;
+    }
+
+    .upload-area {
+        padding: 60px 32px;
+    }
+}
