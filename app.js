@@ -89,6 +89,7 @@
             state.overlayImage = src;
 
             updateOverlayTransform();
+            showScreen('camera');
             startCamera();
         };
         img.onerror = function () {
@@ -195,29 +196,29 @@
 
             await els.cameraFeed.play();
 
-            showScreen('camera');
             els.statusText.textContent = 'Adjust your overlay';
         } catch (err) {
+            els.statusText.textContent = 'Camera unavailable — overlay only';
             if (
                 err.name === 'NotAllowedError' ||
                 err.name === 'PermissionDeniedError'
             ) {
                 showError(
-                    'Camera access denied. Please allow camera access in your browser settings and try again.'
+                    'Camera access denied. Your image is still loaded — you can use it without the camera, or allow camera access in your browser settings and tap retry.'
                 );
             } else if (
                 err.name === 'NotFoundError' ||
                 err.name === 'DevicesNotFoundError'
             ) {
                 showError(
-                    'No camera found. Please connect a camera and try again.'
+                    'No camera found. Your image is still loaded — connect a camera and tap retry.'
                 );
             } else if (
                 err.name === 'NotReadableError' ||
                 err.name === 'TrackStartError'
             ) {
                 showError(
-                    'Camera is in use by another application. Please close other camera apps and try again.'
+                    'Camera is in use by another application. Your image is still loaded — close other camera apps and tap retry.'
                 );
             } else {
                 showError('Could not access camera: ' + err.message);
