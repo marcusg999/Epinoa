@@ -15,6 +15,7 @@
         locked: false,
         cameraStream: null,
         facingMode: 'environment',
+        cameraReady: false,
         imageWidth: 0,
         imageHeight: 0,
     };
@@ -56,7 +57,30 @@
         errorRetryBtn: $('#error-retry-btn'),
         errorDismissBtn: $('#error-dismiss-btn'),
         statusText: $('#status-text'),
+        cameraLoading: $('#camera-loading'),
+        httpsWarning: $('#https-warning'),
     };
+
+    // ── Secure Context Check ──
+
+    function isSecureContext() {
+        if (window.isSecureContext) return true;
+        var loc = window.location;
+        if (loc.protocol === 'https:') return true;
+        if (loc.hostname === 'localhost' || loc.hostname === '127.0.0.1') return true;
+        return false;
+    }
+
+    function checkCameraSupport() {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            if (!isSecureContext()) {
+                if (els.httpsWarning) els.httpsWarning.hidden = false;
+                return 'insecure';
+            }
+            return 'unsupported';
+        }
+        return 'supported';
+    }
 
     // ── Image Loading ──
 
@@ -66,7 +90,7 @@
             return;
         }
 
-        const reader = new FileReader();
+        var reader = new FileReader();
         reader.onload = function (e) {
             setOverlayImage(e.target.result);
         };
@@ -77,7 +101,7 @@
     }
 
     function setOverlayImage(src) {
-        const img = new Image();
+        var img = new Image();
         img.onload = function () {
             state.imageWidth = img.naturalWidth;
             state.imageHeight = img.naturalHeight;
@@ -90,6 +114,7 @@
 
             updateOverlayTransform();
             showScreen('camera');
+            showCameraLoading(true);
             startCamera();
         };
         img.onerror = function () {
@@ -99,12 +124,12 @@
     }
 
     function fitImageToScreen() {
-        const vw = window.innerWidth;
-        const vh = window.innerHeight;
-        const imgAspect = state.imageWidth / state.imageHeight;
-        const screenAspect = vw / vh;
+        var vw = window.innerWidth;
+        var vh = window.innerHeight;
+        var imgAspect = state.imageWidth / state.imageHeight;
+        var screenAspect = vw / vh;
 
-        let displayW, displayH;
+        var displayW, displayH;
         if (imgAspect > screenAspect) {
             displayW = vw * 0.85;
             displayH = displayW / imgAspect;
@@ -123,10 +148,10 @@
     }
 
     function createSampleImage() {
-        const canvas = document.createElement('canvas');
+        var canvas = document.createElement('canvas');
         canvas.width = 600;
         canvas.height = 800;
-        const ctx = canvas.getContext('2d');
+        var ctx = canvas.getContext('2d');
 
         ctx.fillStyle = '#1a1a2e';
         ctx.fillRect(0, 0, 600, 800);
@@ -175,78 +200,159 @@
 
     // ── Camera ──
 
+    function showCameraLoading(show) {
+        if (els.cameraLoading) {
+            els.cameraLoading.hidden = !show;
+        }
+    }
+
     async function startCamera() {
+        var support = checkCameraSupport();
+        if (support !== 'supported') {
+            showCameraLoading(false);
+            state.cameraReady = false;
+            if (support === 'insecure') {
+                els.statusText.textContent = 'HTTPS required for camera';
+                showError(
+                    'Camera requires a secure connection (HTTPS). ' +
+                    'Please access this app via HTTPS to enable the camera for AR tracing. ' +
+                    'Your reference image is loaded — you can still view it.'
+                );
+            } else {
+                els.statusText.textContent = 'Camera not supported';
+                showError(
+                    'Your browser does not support camera access. ' +
+                    'Try using Chrome, Safari, or Firefox on your phone. ' +
+                    'Your reference image is loaded — you can still view it.'
+                );
+            }
+            return;
+        }
+
+        els.statusText.textContent = 'Starting camera...';
+
         try {
             if (state.cameraStream) {
-                state.cameraStream.getTracks().forEach((t) => t.stop());
+                state.cameraStream.getTracks().forEach(function (t) { t.stop(); });
+                state.cameraStream = null;
             }
 
-            const constraints = {
-                video: {
-                    facingMode: state.facingMode,
-                    width: { ideal: 1920 },
-                    height: { ideal: 1080 },
-                },
-                audio: false,
-            };
-
-            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            var stream = await tryGetCamera();
             state.cameraStream = stream;
             els.cameraFeed.srcObject = stream;
 
             await els.cameraFeed.play();
 
-            els.statusText.textContent = 'Adjust your overlay';
+            state.cameraReady = true;
+            showCameraLoading(false);
+            els.statusText.textContent = 'Position your paper below — adjust overlay to trace';
         } catch (err) {
-            els.statusText.textContent = 'Camera unavailable — overlay only';
-            if (
-                err.name === 'NotAllowedError' ||
-                err.name === 'PermissionDeniedError'
-            ) {
-                showError(
-                    'Camera access denied. Your image is still loaded — you can use it without the camera, or allow camera access in your browser settings and tap retry.'
-                );
-            } else if (
-                err.name === 'NotFoundError' ||
-                err.name === 'DevicesNotFoundError'
-            ) {
-                showError(
-                    'No camera found. Your image is still loaded — connect a camera and tap retry.'
-                );
-            } else if (
-                err.name === 'NotReadableError' ||
-                err.name === 'TrackStartError'
-            ) {
-                showError(
-                    'Camera is in use by another application. Your image is still loaded — close other camera apps and tap retry.'
-                );
-            } else {
-                showError('Could not access camera: ' + err.message);
+            showCameraLoading(false);
+            state.cameraReady = false;
+            handleCameraError(err);
+        }
+    }
+
+    async function tryGetCamera() {
+        // Try 1: Preferred facing mode with ideal resolution
+        try {
+            return await navigator.mediaDevices.getUserMedia({
+                video: {
+                    facingMode: { ideal: state.facingMode },
+                    width: { ideal: 1920 },
+                    height: { ideal: 1080 },
+                },
+                audio: false,
+            });
+        } catch (e) {
+            if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
+                throw e;
             }
+        }
+
+        // Try 2: Preferred facing mode, no resolution constraint
+        try {
+            return await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: { ideal: state.facingMode } },
+                audio: false,
+            });
+        } catch (e) {
+            if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
+                throw e;
+            }
+        }
+
+        // Try 3: Any camera
+        try {
+            return await navigator.mediaDevices.getUserMedia({
+                video: true,
+                audio: false,
+            });
+        } catch (e) {
+            throw e;
+        }
+    }
+
+    function handleCameraError(err) {
+        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+            els.statusText.textContent = 'Camera access denied';
+            showError(
+                'Camera access was denied. The camera shows your drawing surface ' +
+                '(paper/canvas) so you can trace the reference image onto it.\n\n' +
+                'To enable:\n' +
+                '• iOS Safari: Settings > Safari > Camera > Allow\n' +
+                '• Android Chrome: Tap the lock icon in the address bar > Permissions > Camera > Allow\n\n' +
+                'Then tap Retry below.'
+            );
+        } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+            els.statusText.textContent = 'No camera found';
+            showError(
+                'No camera was found on this device. ' +
+                'The camera is needed to show your drawing surface for AR tracing. ' +
+                'Please use a device with a camera (phone or tablet).'
+            );
+        } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+            els.statusText.textContent = 'Camera busy';
+            showError(
+                'The camera is being used by another app. ' +
+                'Close any other apps using the camera (video calls, other camera apps) and tap Retry.'
+            );
+        } else if (err.name === 'OverconstrainedError') {
+            els.statusText.textContent = 'Camera error';
+            showError(
+                'Could not start the camera with the requested settings. Tap Retry to try again.'
+            );
+        } else {
+            els.statusText.textContent = 'Camera error';
+            showError(
+                'Could not access camera: ' + (err.message || 'Unknown error') + '. ' +
+                'Make sure no other app is using the camera and tap Retry.'
+            );
         }
     }
 
     async function switchCamera() {
-        state.facingMode =
-            state.facingMode === 'environment' ? 'user' : 'environment';
+        state.facingMode = state.facingMode === 'environment' ? 'user' : 'environment';
+        showCameraLoading(true);
         await startCamera();
     }
 
     function stopCamera() {
         if (state.cameraStream) {
-            state.cameraStream.getTracks().forEach((t) => t.stop());
+            state.cameraStream.getTracks().forEach(function (t) { t.stop(); });
             state.cameraStream = null;
         }
         els.cameraFeed.srcObject = null;
+        state.cameraReady = false;
     }
 
     // ── Overlay Transform ──
 
     function updateOverlayTransform() {
-        const tx = state.x;
-        const ty = state.y;
-        const s = state.scale;
-        const r = state.rotation;
+        var tx = state.x;
+        var ty = state.y;
+        var s = state.scale;
+        var r = state.rotation;
 
         els.overlayImage.style.transform =
             'translate(-50%, -50%) ' +
@@ -260,8 +366,8 @@
     // ── Touch/Pointer Handling ──
 
     function getDistance(p1, p2) {
-        const dx = p2.clientX - p1.clientX;
-        const dy = p2.clientY - p1.clientY;
+        var dx = p2.clientX - p1.clientX;
+        var dy = p2.clientY - p1.clientY;
         return Math.sqrt(dx * dx + dy * dy);
     }
 
@@ -289,13 +395,13 @@
             touch.lastX = state.x;
             touch.lastY = state.y;
         } else if (touch.pointers.size === 2) {
-            const pts = Array.from(touch.pointers.values());
+            var pts = Array.from(touch.pointers.values());
             touch.startDist = getDistance(pts[0], pts[1]);
             touch.startAngle = getAngle(pts[0], pts[1]);
             touch.startScale = state.scale;
             touch.startRotation = state.rotation;
 
-            const mid = getMidpoint(pts[0], pts[1]);
+            var mid = getMidpoint(pts[0], pts[1]);
             touch.startX = mid.x;
             touch.startY = mid.y;
             touch.lastX = state.x;
@@ -309,25 +415,25 @@
         touch.pointers.set(e.pointerId, e);
 
         if (touch.pointers.size === 1) {
-            const dx = e.clientX - touch.startX;
-            const dy = e.clientY - touch.startY;
+            var dx = e.clientX - touch.startX;
+            var dy = e.clientY - touch.startY;
             state.x = touch.lastX + dx;
             state.y = touch.lastY + dy;
         } else if (touch.pointers.size === 2) {
-            const pts = Array.from(touch.pointers.values());
-            const dist = getDistance(pts[0], pts[1]);
-            const angle = getAngle(pts[0], pts[1]);
-            const mid = getMidpoint(pts[0], pts[1]);
+            var pts = Array.from(touch.pointers.values());
+            var dist = getDistance(pts[0], pts[1]);
+            var angle = getAngle(pts[0], pts[1]);
+            var mid = getMidpoint(pts[0], pts[1]);
 
-            const scaleRatio = dist / touch.startDist;
+            var scaleRatio = dist / touch.startDist;
             state.scale = Math.max(0.05, Math.min(10, touch.startScale * scaleRatio));
 
             state.rotation = touch.startRotation + (angle - touch.startAngle);
 
-            const dx = mid.x - touch.startX;
-            const dy = mid.y - touch.startY;
-            state.x = touch.lastX + dx;
-            state.y = touch.lastY + dy;
+            var dx2 = mid.x - touch.startX;
+            var dy2 = mid.y - touch.startY;
+            state.x = touch.lastX + dx2;
+            state.y = touch.lastY + dy2;
         }
 
         updateOverlayTransform();
@@ -339,7 +445,7 @@
         if (touch.pointers.size === 0) {
             touch.active = false;
         } else if (touch.pointers.size === 1) {
-            const remaining = Array.from(touch.pointers.values())[0];
+            var remaining = Array.from(touch.pointers.values())[0];
             touch.startX = remaining.clientX;
             touch.startY = remaining.clientY;
             touch.lastX = state.x;
@@ -347,12 +453,11 @@
         }
     }
 
-    // Mouse wheel zoom (desktop)
     function onWheel(e) {
         if (state.locked) return;
         e.preventDefault();
 
-        const delta = e.deltaY > 0 ? 0.95 : 1.05;
+        var delta = e.deltaY > 0 ? 0.95 : 1.05;
         state.scale = Math.max(0.05, Math.min(10, state.scale * delta));
         updateOverlayTransform();
     }
@@ -400,26 +505,26 @@
         els.lockBtn.classList.toggle('active', state.locked);
         els.overlayImage.classList.toggle('locked', state.locked);
         els.statusText.textContent = state.locked
-            ? 'Overlay locked'
-            : 'Adjust your overlay';
+            ? 'Overlay locked — trace onto your surface'
+            : 'Position your paper below — adjust overlay to trace';
     }
 
     // ── Event Binding ──
 
     function init() {
-        // Upload area click
+        // Check camera support on load
+        checkCameraSupport();
+
         on(els.uploadArea, 'click', function () {
             els.imageInput.click();
         });
 
-        // File input change
         on(els.imageInput, 'change', function (e) {
             if (e.target.files && e.target.files[0]) {
                 loadImage(e.target.files[0]);
             }
         });
 
-        // Drag and drop
         on(els.uploadArea, 'dragover', function (e) {
             e.preventDefault();
             e.stopPropagation();
@@ -441,22 +546,18 @@
             }
         });
 
-        // Sample image
         on(els.sampleBtn, 'click', function () {
             setOverlayImage(createSampleImage());
         });
 
-        // Opacity slider
         on(els.opacitySlider, 'input', function (e) {
             setOpacity(parseInt(e.target.value, 10));
         });
 
-        // Prevent slider from triggering overlay drag
         on(els.opacitySlider, 'pointerdown', function (e) {
             e.stopPropagation();
         });
 
-        // Back button
         on(els.backBtn, 'click', function () {
             stopCamera();
             els.overlayImage.classList.remove('loaded');
@@ -465,21 +566,18 @@
             state.locked = false;
             els.lockBtn.classList.remove('active');
             els.overlayImage.classList.remove('locked');
+            showCameraLoading(false);
             showScreen('landing');
         });
 
-        // Switch camera
         on(els.switchCameraBtn, 'click', function () {
             switchCamera();
         });
 
-        // Reset
         on(els.resetBtn, 'click', resetOverlay);
 
-        // Lock
         on(els.lockBtn, 'click', toggleLock);
 
-        // New image button
         on(els.newImageBtn, 'click', function () {
             els.newImageInput.click();
         });
@@ -490,10 +588,10 @@
             }
         });
 
-        // Error overlay
         on(els.errorRetryBtn, 'click', function () {
             hideError();
             if (state.overlayImage) {
+                showCameraLoading(true);
                 startCamera();
             }
         });
@@ -501,28 +599,25 @@
         on(els.errorDismissBtn, 'click', hideError);
 
         // Touch/pointer events on overlay container
-        const container = els.overlayContainer;
+        var container = els.overlayContainer;
         on(container, 'pointerdown', onPointerDown);
         on(container, 'pointermove', onPointerMove);
         on(container, 'pointerup', onPointerUp);
         on(container, 'pointercancel', onPointerUp);
         on(container, 'wheel', onWheel, { passive: false });
 
-        // Prevent default touch behaviors on the camera screen
         on(els.cameraScreen, 'touchmove', function (e) {
             if (e.target !== els.opacitySlider) {
                 e.preventDefault();
             }
         }, { passive: false });
 
-        // Handle orientation changes
         on(window, 'resize', function () {
             if (state.overlayImage && els.cameraScreen.classList.contains('active')) {
                 updateOverlayTransform();
             }
         });
 
-        // Keyboard shortcuts (desktop)
         on(document, 'keydown', function (e) {
             if (!els.cameraScreen.classList.contains('active')) return;
 
@@ -556,7 +651,6 @@
         });
     }
 
-    // ── Start ──
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
     } else {

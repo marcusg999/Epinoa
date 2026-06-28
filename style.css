@@ -312,6 +312,72 @@ html, body {
     color: var(--text);
 }
 
+/* Camera loading indicator */
+.camera-loading {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    background: rgba(0, 0, 0, 0.7);
+    color: var(--text);
+}
+
+.camera-loading[hidden] {
+    display: none;
+}
+
+.camera-loading p {
+    font-size: 15px;
+    color: var(--text-dim);
+}
+
+.camera-loading .hint {
+    font-size: 12px;
+    opacity: 0.6;
+}
+
+.loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(255, 255, 255, 0.2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* HTTPS warning banner */
+.warning-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    background: rgba(255, 152, 0, 0.15);
+    border: 1px solid rgba(255, 152, 0, 0.3);
+    border-radius: 10px;
+    color: #ffb74d;
+    font-size: 12px;
+    width: 100%;
+    max-width: 300px;
+    line-height: 1.4;
+}
+
+.warning-banner[hidden] {
+    display: none;
+}
+
+.warning-banner svg {
+    flex-shrink: 0;
+    color: #ff9800;
+}
+
 /* Error overlay */
 .overlay {
     position: fixed;
@@ -343,6 +409,7 @@ html, body {
     font-size: 15px;
     color: var(--text-dim);
     line-height: 1.5;
+    white-space: pre-line;
 }
 
 /* Locked state visual */
